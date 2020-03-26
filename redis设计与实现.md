@@ -343,6 +343,7 @@ key_value_pairs的结构:
     
     | len | string |
     | - | - |
+    
     压缩字符串结构
     
     | REDIS_RDB_ENC_LZF | compressed_len | origin_len | compressed_string |
