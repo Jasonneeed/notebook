@@ -219,8 +219,65 @@
 
 #### 1.7 对象
   
-  这一部分暂未想好如何总结
+  五种对象类型:字符串对象，列表对象，哈希对象，集合对象和有序集合对象。每个对象由一个RedisObject结构表示：
+  ``` C
+  typedef struct redisObject{
+    //类型
+    unsigned type:4;
+    //编码
+    unsigned encoding：4；
+    //指向底层实现数据结构的指针
+    void *ptr；
+  }
+  ```
+  不同类型和编码的对象：
+  
+  |类型|编码|对象|
+  |-|-|-|
+  |REDIS_STRING|REDIS_ENCODING_INT|使用整数值实现的字符串对象|
+  |REDIS_STRING|REDIS_ENCODING_EMBSTR|使用embstr编码的简单动态字符串实现的字符串对象|
+  |REDIS_STRING|REDIS_ENCODING_RAW|使用简单动态字符串实现的字符串对象|
+  |REDIS_LIST|REDIS_ENCODING_ZIPLIST|使用压缩列表实现的列表对象|
+  |REDIS_LIST|REDIS_ENCODING_LINKEDLIST|使用链表实现的列表对象|
+  |REDIS_HASH|REDIS_ENCODING_ZIPLIST|使用压缩列表实现的哈希对象|
+  |REDIS_HASH|REDIS_ENCODING_HT|使用字典实现的哈希对象|
+  |REDIS_SET|REDIS_ENCODING_INTSET|使用整数集合实现的集合对象|
+  |REDIS_SET|REDIS_ENCODING_HT|使用字典实现的集合对象|
+  |REDIS_ZSET|REDIS_ENCODING_ZIPLIST|使用压缩列表实现的有序集合对象|
+  |REDIS_ZSET|REDIS_ENCODING_SKIPLIST|使用跳跃表实现的有序集合对象|
+  
+##### 1.7.1 字符串对象
+* 如果一个字符串对象保存的是整数值且可以使用long类型表示，字符串编码类型为int；
+* 如果字符串对象保存的是一个字符串值，且字符串长度大于32字节，那么将用一个SDS来保存该字符串值，编码设置为raw;
+* 字符串对象保存的是一个字符串值，且字符长度小于等于32字节，那么编码设置为embstr(实际上该编码对象为只读)；
+* 使用embstr编码保存短字符串的优势：
+  1. embstr编码将创建字符串对象所需的内存分配次数从raw编码的两次降为一次；
+  2. 释放embstr编码的字符串对象只需调用一次内存释放函数，而释放raw编码需要调用两次内存释放函数。
+  3. embstr编码的字符串对象所有数据都保存在一块连续的内存里面。
+##### 1.7.2 列表对象
 
+同时满足这两个条件列表对象使用ziplist编码，否则使用linkedlist编码:
+
+* 列表对象的所有字符串元素的长度都小于64字节
+* 列表对象保存的元素数量小于512个。
+##### 1.7.3 哈希对象
+
+同时满足一下两个条件时使用ziplist编码，否则使用hashtable编码：
+* 哈希对象保存的所有键值对的键和值的字符串长度都小于64字节；
+* 哈希对象保存的键值对数量小于512个。
+##### 1.7.4 集合对象
+
+同时满足以下两个条件时使用intset编码，否则使用hashtable编码：
+* 集合对象保存的所有元素都是整数值；
+* 集合对象保存的元素数量不超过512个；
+##### 1.7.5 有序集合对象
+
+同时满足以下两个条件时使用ziplist编码，否则使用skiplist编码：
+* 有序集合保存的元素数量小于128个；
+* 有序集合保存的所有元素成员的长度都小于64字节；
+##### 1.7.6 内存回收
+
+redis构建了一个引用计数技术实现的内存回收机制。
 ## 二、单机Redis
 #### 2.1 redis数据库概述
 ##### 2.1.1 服务器中的数据库结构
